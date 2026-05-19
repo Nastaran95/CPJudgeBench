@@ -1,0 +1,28 @@
+Generate one candidate CP model for this problem.
+
+Problem:
+{problem_description}
+
+Reference model (for understanding only):
+{reference_cp_model}
+
+Example instance:
+{example_instance}
+
+Language: {language}
+Target label: equivalent
+Target behavior: {label_guidance}
+
+Before writing code, reason through these steps:
+1. COMPREHEND – Identify decision variables, all hard constraints (including implicit ones), and feasibility semantics.
+2. DIVERGE – Choose a structurally distinct reformulation: change variable type/perspective, swap constraint families, or adopt a dual viewpoint. Cosmetic rewrites (renaming, reordering) do not qualify. Mark your strategy in a top-of-file comment.
+3. AUDIT – Confirm every reference constraint is semantically covered and no unintended restrictions are added. Verify objectives evaluate identically on all feasible assignments.
+4. GATE – Only output code if both hold: (a) formulation is structurally distinct, (b) solution space is provably identical. Otherwise revise.
+
+Practical requirements:
+- Prefer propagation-efficient encodings; add auxiliary variables only when they strengthen propagation.
+- Keep variable names domain-aligned (not reference-aligned) for evaluator compatibility.
+- Preserve all expected instance fields with correct types.
+- Output solutions using the same variable names and structure as the reference model so solutions can be directly compared.
+
+{feedback_section}{previous_attempt_section}Output only raw code (no prose, no markdown fences). Use Python for CPMpy/pyCSP3 and .mzn text for MiniZinc. Place both flaw strategies as a single-line comment at the top, using `%` for MiniZinc and `#` for Python.

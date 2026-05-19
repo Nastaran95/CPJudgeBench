@@ -1,0 +1,26 @@
+Generate one candidate CP model for this problem.
+
+Problem:
+{problem_description}
+
+Reference model (for understanding only):
+{reference_cp_model}
+
+Example instance:
+{example_instance}
+
+Language: {language}
+Target label: non-executable
+Target behavior: {label_guidance}
+
+Before writing code, reason through these steps:
+1. COMPREHEND – Understand the intended model well enough to write a near-correct version.
+2. TARGET – Introduce exactly one realistic flaw that prevents execution: wrong API argument, undefined variable, invalid syntax, non-existent global constraint, or incompatible operand types.
+3. PLACE – Embed the flaw naturally within an otherwise coherent model so it resembles a plausible modeler mistake.
+4. GATE – Only output code if: (a) the flaw provably prevents execution, (b) the surrounding model is otherwise structurally reasonable.
+
+Practical requirements:
+- Preserve expected instance fields and problem-aligned variable names.
+- Place the flaw type as a single-line comment at the top.
+
+{feedback_section}{previous_attempt_section}Output only raw code (no prose, no markdown fences). Use Python for CPMpy/pyCSP3 and .mzn text for MiniZinc.

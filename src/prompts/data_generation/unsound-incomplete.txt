@@ -1,0 +1,27 @@
+Generate one candidate CP model for this problem.
+
+Problem:
+{problem_description}
+
+Reference model (for understanding only):
+{reference_cp_model}
+
+Example instance:
+{example_instance}
+
+Language: {language}
+Target label: unsound-incomplete
+Target behavior: {label_guidance}
+
+Before writing code, reason through these steps:
+1. COMPREHEND – Identify decision variables, all hard constraints (including implicit ones), and feasibility semantics.
+2. TARGET – Introduce two independent deliberate flaws, one per direction: one relaxation that admits at least one invalid solution (unsoundness), and one restriction that excludes at least one valid solution (incompleteness). The two flaws must be independent — not two sides of the same change.
+3. AUDIT – Confirm each flaw is traceable to exactly one deliberate change, and that the two flaws do not accidentally cancel each other out.
+4. GATE – Only output code if all hold: (a) at least one invalid solution is admitted, (b) at least one valid solution is excluded, (c) the flaws are independent. Otherwise revise.
+
+Practical requirements:
+- Keep each flaw subtle but structurally clear — the model should resemble a plausible but doubly-mistaken attempt.
+- Preserve all expected instance fields with correct types.
+- Output solutions using the same variable names and structure as the reference model so solutions can be directly compared.
+
+{feedback_section}{previous_attempt_section}Output only raw code (no prose, no markdown fences). Use Python for CPMpy/pyCSP3 and .mzn text for MiniZinc. Place both flaw strategies as a single-line comment at the top, using `%` for MiniZinc and `#` for Python.
