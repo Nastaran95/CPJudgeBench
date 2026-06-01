@@ -89,7 +89,6 @@ src/
 preprocess_dcp_open.py   # optional preprocessing of DCP-Bench-Open problems
 ```
 
-The `example.ipynb` notebook provides an exploratory walk-through of the same workflow.
 
 ## Problem input
 
