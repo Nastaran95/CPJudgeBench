@@ -75,7 +75,7 @@ A trimmed snapshot for the `domino_tiling` problem lives in [`sample-data/`](sam
 ## Project structure
 
 ```
-main.py              # CLI entry point
+main.py              # entry point
 src/
   main.py            # argument parsing and pipeline orchestration
   config.py          # experiment context and model lists
@@ -84,8 +84,6 @@ src/
   executors.py       # run models and enumerate solution spaces
   generation.py      # LLM prompts for instances and candidates
   llm.py             # OpenRouter client
-  meta_eval.py       # SAT-only baseline
-  pairwise_judge.py  # pairwise judge variant
 preprocess_dcp_open.py   # optional preprocessing of DCP-Bench-Open problems
 ```
 
