@@ -45,8 +45,8 @@ python main.py \
 | `--generate-instances` | LLM-generated benchmark instances |
 | `--data-generation` | Generate + validate candidate models per correctness label |
 | `--judge` | LLM-as-judge evaluation (`--judge-approach` selects variant) |
-| `--pairwise-judge` | Pairwise comparison of candidates |
-| `--sat-meta-eval` | SAT-only meta-evaluation baseline |
+<!-- | `--pairwise-judge` | Pairwise comparison of candidates |
+| `--sat-meta-eval` | SAT-only meta-evaluation baseline | -->
 
 Judge approaches: `reference_free`, `reference_based`, `score_reference_free`, `score_reference_based`, `binary_reference_free`, `binary_reference_based`.
 
