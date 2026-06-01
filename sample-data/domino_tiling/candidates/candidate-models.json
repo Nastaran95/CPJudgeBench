@@ -1,0 +1,44 @@
+{
+  "openai/gpt-5.1-codex-mini": {
+    "minizinc": {
+      "unsound": {
+        "ok": true,
+        "code": "% Divergence strategy: encode per-cell tile roles with adjacency pairing constraints instead of enumerating domino starts.\nint: m;\nint: n;\n\narray[1..m, 1..n] of var 0..3: tile;\narray[1..m, 1..n] of var bool: h;\narray[1..m, 1..n] of var bool: v;\n\nconstraint forall(i in 1..m, j in 1..n)(\n  h[i,j] <-> tile[i,j] = 0 /\\\n  v[i,j] <-> tile[i,j] = 2\n);\n\nconstraint forall(i in 1..m, j in 1..n)(\n  tile[i,j] != 0 \\/ j < n\n);\nconstraint forall(i in 1..m, j in 1..n)(\n  tile[i,j] != 1 \\/ j > 1\n);\nconstraint forall(i in 1..m, j in 1..n)(\n  tile[i,j] != 2 \\/ i < m\n);\nconstraint forall(i in 1..m, j in 1..n)(\n  tile[i,j] != 3 \\/ i > 1\n);\n\nconstraint forall(i in 1..m, j in 1..n-1)(\n  tile[i,j] = 0 -> tile[i,j+1] = 1\n);\nconstraint forall(i in 1..m, j in 2..n)(\n  tile[i,j] = 1 -> tile[i,j-1] = 0\n);\nconstraint forall(i in 1..m-1, j in 1..n)(\n  tile[i,j] = 2 -> tile[i+1,j] = 3\n);\nconstraint forall(i in 2..m, j in 1..n)(\n  tile[i,j] = 3 -> tile[i-1,j] = 2\n);\n\nsolve satisfy;\n\noutput [\n  \"h=\\n\", show(h), \"\\n\",\n  \"v=\\n\", show(v), \"\\n\"\n];"
+      },
+      "equivalent": {
+        "ok": true,
+        "code": "% Divergence: introduce per-cell coverage indicators (left/right/up/down) tied to domino starts so each cell sees exactly one coverage direction instead of summing neighbor starts directly.\nint: m;\nint: n;\n\narray[1..m, 1..n - 1] of var bool: h;\narray[1..m - 1, 1..n] of var bool: v;\n\narray[1..m, 1..n] of var bool: cover_left;\narray[1..m, 1..n] of var bool: cover_right;\narray[1..m, 1..n] of var bool: cover_up;\narray[1..m, 1..n] of var bool: cover_down;\n\nconstraint forall(i in 1..m, j in 1..n - 1)(\n  cover_right[i, j] = h[i, j]\n);\nconstraint forall(i in 1..m, j in 2..n)(\n  cover_left[i, j] = h[i, j - 1]\n);\nconstraint forall(i in 1..m)(\n  cover_left[i, 1] = false /\\\n  cover_right[i, n] = false\n);\n\nconstraint forall(i in 1..m - 1, j in 1..n)(\n  cover_down[i, j] = v[i, j]\n);\nconstraint forall(i in 2..m, j in 1..n)(\n  cover_up[i, j] = v[i - 1, j]\n);\nconstraint forall(j in 1..n)(\n  cover_up[1, j] = false /\\\n  cover_down[m, j] = false\n);\n\nconstraint forall(i in 1..m, j in 1..n)(\n  bool2int(cover_left[i, j]) +\n  bool2int(cover_right[i, j]) +\n  bool2int(cover_up[i, j]) +\n  bool2int(cover_down[i, j]) = 1\n);\n\nsolve satisfy;\n\noutput [\n  \"h=\\n\", show(h), \"\\n\",\n  \"v=\\n\", show(v), \"\\n\"\n];"
+      },
+      "non-executable": {
+        "ok": true,
+        "code": "# over-restrict: forbid vertical domino starts on the first row (incomplete)\nfrom cpmpy import *\n\nm = 4\nn = 6\n\nh = boolvar(shape=(m, n - 1), name=\"h\")  # horizontal domino starts\nv = boolvar(shape=(m - 1, n), name=\"v\")  # vertical domino starts\n\nmodel = Model()\nfor i in range(m):\n    for j in range(n):\n        cover = []\n        if j > 0:\n            cover.append(h[i, j - 1])\n        if j < n - 1:\n            cover.append(h[i, j])\n        if i > 0:\n            cover.append(v[i - 1, j])\n        if i < m - 1:\n            cover.append(v[i, j])\n        model += (sum(cover) == 1)\n\nif m > 1:\n    for j in range(n):\n        model += (v[0, j] == 0)\n\nif model.solve():\n    print(h.value())\n    print(v.value())\nelse:\n    print(\"No solution found.\")"
+      },
+      "incomplete": {
+        "ok": true,
+        "code": "% over-restrict: forbid vertical domino starts on the first row (incomplete)\nint: m = 4;\nint: n = 6;\n\narray[1..m, 1..n - 1] of var bool: h;\narray[1..m - 1, 1..n] of var bool: v;\n\nconstraint forall(i in 1..m, j in 1..n)(\n  sum([\n    if j > 1 then bool2int(h[i, j - 1]) else 0 endif,\n    if j < n then bool2int(h[i, j]) else 0 endif,\n    if i > 1 then bool2int(v[i - 1, j]) else 0 endif,\n    if i < m then bool2int(v[i, j]) else 0 endif\n  ]) == 1\n);\n\nconstraint forall(j in 1..n)( v[1, j] == false );\n\nsolve satisfy;\n\noutput [\"h = \\(h)\\n\", \"v = \\(v)\\n\"];"
+      },
+      "unsound-incomplete": {
+        "ok": true,
+        "code": "%Relax: sum of coverings >=1 allowing overlaps to stay invalid; Restrict: force every v to false so tilings with vertical dominoes are excluded\nint: m;\nint: n;\n\narray[1..m, 1..n-1] of var bool: h;\narray[1..m-1, 1..n] of var bool: v;\n\nconstraint\n forall(i in 1..m, j in 1..n) (\n  let {\n    array[1..4] of var int: cover = [\n      if j > 1 then bool2int(h[i, j-1]) else 0 endif,\n      if j < n then bool2int(h[i, j]) else 0 endif,\n      if i > 1 then bool2int(v[i-1, j]) else 0 endif,\n      if i < m then bool2int(v[i, j]) else 0 endif\n    ]\n  } in\n    sum(cover) >= 1\n );\n\nconstraint forall(i in 1..m-1, j in 1..n) (\n  v[i, j] = false\n);\n\nsolve satisfy;\n\noutput [\n  \"h = \\(h)\\n\",\n  \"v = \\(v)\\n\"\n];"
+      }
+    },
+    "CPMpy": {
+      "equivalent": {
+        "ok": true,
+        "code": "# Strategy: use cell-wise orientation links (dual view) plus adjacency implications for propagation\nfrom cpmpy import *\n\nm = 4\nn = 6\n\norientation = intvar(0, 3, shape=(m, n), name=\"orientation\")\nh = boolvar(shape=(m, n - 1), name=\"h\")\nv = boolvar(shape=(m - 1, n), name=\"v\")\n\nmodel = Model()\n\nfor i in range(m):\n    for j in range(n):\n        if j == n - 1:\n            model += (orientation[i, j] != 0)\n        if j == 0:\n            model += (orientation[i, j] != 1)\n        if i == m - 1:\n            model += (orientation[i, j] != 2)\n        if i == 0:\n            model += (orientation[i, j] != 3)\n\n        if j < n - 1:\n            model += (orientation[i, j] == 0).implies(orientation[i, j + 1] == 1)\n        if j > 0:\n            model += (orientation[i, j] == 1).implies(orientation[i, j - 1] == 0)\n        if i < m - 1:\n            model += (orientation[i, j] == 2).implies(orientation[i + 1, j] == 3)\n        if i > 0:\n            model += (orientation[i, j] == 3).implies(orientation[i - 1, j] == 2)\n\nfor i in range(m):\n    for j in range(n - 1):\n        model += (h[i, j] == (orientation[i, j] == 0))\n\nfor i in range(m - 1):\n    for j in range(n):\n        model += (v[i, j] == (orientation[i, j] == 2))\n\nif model.solve():\n    print(h.value())\n    print(v.value())"
+      },
+      "unsound": {
+        "ok": true,
+        "code": "# flaw: relax per-cell cover constraint to >=1 so overlaps are allowed\nfrom cpmpy import *\n\nm = 4\nn = 6\n\nh = boolvar(shape=(m, n - 1), name=\"h\")\nv = boolvar(shape=(m - 1, n), name=\"v\")\n\nmodel = Model()\nfor i in range(m):\n    for j in range(n):\n        cover = []\n        if j > 0:\n            cover.append(h[i, j - 1])\n        if j < n - 1:\n            cover.append(h[i, j])\n        if i > 0:\n            cover.append(v[i - 1, j])\n        if i < m - 1:\n            cover.append(v[i, j])\n        model += (sum(cover) >= 1)\n\nif model.solve():\n    print(h.value())\n    print(v.value())"
+      },
+      "incomplete": {
+        "ok": true,
+        "code": "# strategy1: require at least one vertical domino in the first column; strategy2: require at least one horizontal domino in the top row when a horizontal placement exists\nfrom cpmpy import *\n\nm = 4\nn = 6\n\nh = boolvar(shape=(m, n - 1), name=\"h\")\nv = boolvar(shape=(m - 1, n), name=\"v\")\n\nmodel = Model()\nfor i in range(m):\n    for j in range(n):\n        cover = []\n        if j > 0:\n            cover.append(h[i, j - 1])\n        if j < n - 1:\n            cover.append(h[i, j])\n        if i > 0:\n            cover.append(v[i - 1, j])\n        if i < m - 1:\n            cover.append(v[i, j])\n        model += (sum(cover) == 1)\n\nif m >= 2 and n >= 1:\n    model += (sum(v[:, 0]) >= 1)\nif n >= 2:\n    model += (sum(h[0, :]) >= 1)\n\nif model.solve():\n    print(h.value())\n    print(v.value())"
+      },
+      "non-executable": {
+        "ok": true,
+        "code": "# flaw: undefined variable dominoes\nfrom cpmpy import *\n\nm = 4\nn = 6\nh = boolvar(shape=(m, n - 1), name=\"h\")\nv = boolvar(shape=(m - 1, n), name=\"v\")\n\nmodel = Model()\nfor i in range(m):\n    for j in range(n):\n        cover = []\n        if j > 0:\n            cover.append(h[i, j - 1])\n        if j < n - 1:\n            cover.append(h[i, j])\n        if i > 0:\n            cover.append(v[i - 1, j])\n        if i < m - 1:\n            cover.append(v[i, j])\n        model += (sum(cover) == 1)\n\nif model.solve():\n    print(h.value())\n    print(v.value())\n    print(dominoes)"
+      }
+    }
+  }
+}

@@ -34,7 +34,8 @@ class ModelSpec:
 
     @property
     def openrouter_model_name(self) -> str:
-        return f"{self.name}:{self.tag}" if self.tag else self.name
+        model_id = f"{self.provider}/{self.name}"
+        return f"{model_id}:{self.tag}" if self.tag else model_id
 
 
 def _require_api_key() -> str:
@@ -47,9 +48,11 @@ def _require_api_key() -> str:
 
 def get_openrouter_llm(spec: ModelSpec):
     """Return a LangChain chat model bound to OpenRouter."""
+    # OpenRouter exposes an OpenAI-compatible API for all providers; route
+    # every model through the OpenAI client with the full OpenRouter model id.
     return init_chat_model(
         model=spec.openrouter_model_name,
-        model_provider=spec.provider,
+        model_provider="openai",
         base_url=OPENROUTER_BASE_URL,
         api_key=_require_api_key(),
     )

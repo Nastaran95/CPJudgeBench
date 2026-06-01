@@ -13,7 +13,6 @@ CORRECTNESS_LABELS: list[str] = [
     "incomplete",
     "unsound-incomplete",
     "non-executable",
-    # "status-only correct",
 ]
 
 LANGUAGE_LABELS: list[str] = [
@@ -23,14 +22,44 @@ LANGUAGE_LABELS: list[str] = [
 ]
 
 GENERATOR_MODELS: list[str] = [
-    "openai/gpt-5.1-codex-mini",
+    "openai/gpt-5.4-mini",
+    # "openai/gpt-5.1-codex-mini",
     # "openai/gpt-4o-mini",
 ]
 
 JUDGE_MODELS: list[str] = [
-    # "openai/gpt-4o-mini",
-    "openai/gpt-5.4-mini",
+    "openai/gpt-4o-mini",
+    "anthropic/claude-sonnet-4.6",
+    "google/gemini-2.5-pro",
+    "meta-llama/llama-4-scout",
+    "qwen/qwen3-32b",
+    "qwen/qwen3-coder-next",
 ]
+
+# JUDGE_MODELS = [
+#     # Commercial / closed models
+#     "openai/gpt-4o-mini",              # small, commercial, cheap general baseline, non-reasoning
+#     "openai/gpt-4.1-mini",             # mid-size commercial, stronger coding/instruction-following baseline
+#     "anthropic/claude-sonnet-4.6",      # commercial, strong general + coding + agentic reasoning
+#     "google/gemini-2.5-pro",            # commercial, large reasoning model, strong coding/math/science
+#     "google/gemini-2.5-flash",          # commercial, cheaper/faster reasoning-capable Gemini baseline
+
+#     # Open-weight / model-weights-available general or reasoning models
+#     "meta-llama/llama-4-scout",         # open-weight, MoE, general, multilingual/multimodal, non-code-focused
+#     "qwen/qwen3-32b",                   # open-weight, dense 32B, general reasoning + coding
+#     "deepseek/deepseek-chat-v3.1",      # open-weight, large MoE, hybrid reasoning/non-reasoning, strong coding
+#     "microsoft/phi-4",                  # open-weight, efficient smaller reasoning/general model
+#     "mistralai/mistral-small-3.2-24b-instruct",  # open-weight, 24B, general + structured output + coding/STEM
+
+#     # Code-specialized models
+#     "qwen/qwen3-coder-next",            # open-weight, code-specialized, efficient MoE coder
+#     "mistralai/codestral-2508",         # code-specialized, low-latency code correction/test-generation baseline
+
+#     # Added strong recent models
+#     "openai/gpt-5.3-codex",             # commercial, strong code-specialized reasoning judge
+#     "minimax/minimax-m2.7",             # MoE, 230B total / 10B active, agentic/general judge
+#     "moonshotai/kimi-k2.6",             # open-weight MoE, 1T total / 32B active, strong reasoning/coding
+# ]
 
 LABEL_GUIDANCE: dict[str, str] = {
     "equivalent": "Semantically equivalent to the intended model.",
@@ -56,9 +85,9 @@ class ExperimentContext:
     decision_variables: list[str]
     data_instances: list[Any] = field(default_factory=list)
     n_instances: int = 3
-    solution_limit: int = 10000
-    time_limit_cpmpy_sec: int = 30
-    time_limit_minizinc_sec: int = 30
+    solution_limit: int = 1000000
+    time_limit_cpmpy_sec: int = 60
+    time_limit_minizinc_sec: int = 60
 
     @property
     def problem_root(self) -> Path:
@@ -156,7 +185,7 @@ def default_context() -> ExperimentContext:
         decision_variables=["h", "v"],
         time_limit_minizinc_sec=60,
         time_limit_cpmpy_sec=60,
-        solution_limit=10000,
+        solution_limit=1000000,
         n_instances=3,
         data_instances=[],
     )

@@ -1,0 +1,11 @@
+# Core dependencies for CPJudgeBench
+cpmpy>=0.9.20          # CP modelling + OR-Tools backend (pulls in ortools)
+pandas>=2.0
+numpy>=1.24
+python-dotenv>=1.0    # load OPENROUTER_API_KEY from .env
+
+# LLM access via OpenRouter (OpenAI-compatible API)
+langchain>=0.3,<0.4
+langchain-openai>=0.2
+
+# MiniZinc models also require the `minizinc` binary on PATH (installed separately).

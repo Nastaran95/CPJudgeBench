@@ -5,6 +5,7 @@ import ast
 import contextlib
 import io
 import json
+import logging
 import re
 import subprocess
 import tempfile
@@ -13,8 +14,11 @@ from typing import Any, Iterator
 
 import numpy as np
 from cpmpy import Model
+from cpmpy.solvers.solver_interface import ExitStatus, SolverInterface
 
 from .config import ExperimentContext
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -229,16 +233,132 @@ def _render_minizinc_dzn(instance_dict: dict[str, Any], code_text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Problem typing & solve-all stop analysis
+# ---------------------------------------------------------------------------
+
+def _model_constructor_has_objective(model_code: str) -> tuple[bool, str]:
+    """Detect ``Model(..., minimize=...)`` / ``Model(..., maximize=...)`` via AST."""
+    try:
+        tree = ast.parse(model_code)
+    except SyntaxError:
+        return False, ""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_model = (
+            (isinstance(func, ast.Name) and func.id == "Model")
+            or (isinstance(func, ast.Attribute) and func.attr == "Model")
+        )
+        if not is_model:
+            continue
+        for kw in node.keywords:
+            if kw.arg in ("minimize", "maximize"):
+                return True, f"objective in Model(...) constructor ({kw.arg}=)"
+    return False, ""
+
+
+def classify_problem_type_strict(model_code: str) -> tuple[str, bool, str]:
+    """Classify a model as CSP or COP from explicit objective calls in source."""
+    if re.search(r"\bmodel\.(minimize|maximize)\s*\(", model_code):
+        return "COP", True, "explicit model.minimize/maximize in code"
+    has_ctor_obj, ctor_reason = _model_constructor_has_objective(model_code)
+    if has_ctor_obj:
+        return "COP", True, ctor_reason
+    if re.search(r"\b(minimize|maximize)\s*\(", model_code):
+        return "COP", True, "explicit minimize/maximize in code"
+    return "CSP", False, "no explicit objective call in code"
+
+
+def analyze_solve_all_stop(
+    enum_model: Model,
+    n_found: int,
+    max_solutions: int,
+    time_limit_sec: int,
+) -> dict[str, Any]:
+    """Infer why solveAll stopped (complete, solution_limit, time_limit, unsat, partial)."""
+    st = enum_model.status()
+    runtime_sec = st.runtime
+    exit_status = st.exitstatus.name if st.exitstatus else "NOT_RUN"
+
+    hit_solution_limit = n_found >= max_solutions
+    hit_time_limit = st.exitstatus == ExitStatus.UNKNOWN or (
+        runtime_sec is not None and runtime_sec >= 0.99 * time_limit_sec
+    )
+    enumeration_complete = (
+        n_found > 0
+        and st.exitstatus == ExitStatus.OPTIMAL
+        and not hit_solution_limit
+    )
+
+    if hit_solution_limit:
+        stop_reason = "solution_limit"
+    elif hit_time_limit:
+        stop_reason = "time_limit"
+    elif st.exitstatus == ExitStatus.UNSATISFIABLE:
+        stop_reason = "unsat"
+    elif enumeration_complete:
+        stop_reason = "complete"
+    elif n_found > 0:
+        stop_reason = "partial"
+    else:
+        stop_reason = "none"
+
+    error = ""
+    if hit_solution_limit:
+        error = f"Reached solution_limit={max_solutions}"
+    elif hit_time_limit:
+        error = f"Reached time_limit={time_limit_sec}s (runtime={runtime_sec})"
+
+    is_complete = enumeration_complete and not hit_time_limit
+
+    return {
+        "error": error,
+        "stop_reason": stop_reason,
+        "exit_status": exit_status,
+        "runtime_sec": runtime_sec,
+        "is_solution_space_complete": is_complete,
+        "hit_solution_limit": hit_solution_limit,
+        "hit_time_limit": hit_time_limit,
+    }
+
+
+# ---------------------------------------------------------------------------
 # CPMpy execution
 # ---------------------------------------------------------------------------
 
-def execute_cpmpy_and_enumerate(
+def _prepare_cpmpy_enum_target(
+    target: Any, *, strip_objective: bool
+) -> tuple[Any | None, str | None]:
+    """Normalize a ``model`` namespace binding for ``solveAll`` enumeration."""
+    if isinstance(target, Model):
+        if strip_objective:
+            return Model(target.constraints), None
+        return target, None
+    if isinstance(target, SolverInterface):
+        if strip_objective and target.has_objective():
+            return None, (
+                "COP feasible enumeration with objective stripping is not "
+                "supported for SolverLookup-based models"
+            )
+        return target, None
+    return None, "`model` is not a CPMpy Model or solver"
+
+
+def execute_cpmpy_enumerate(
     code_text: str,
     instance_dict: dict[str, Any],
     decision_var_names: list[str],
     solution_limit: int,
     time_limit_sec: int,
+    *,
+    strip_objective: bool = False,
 ) -> dict[str, Any]:
+    """Run solveAll and collect decision-variable assignments into a solution set.
+
+    For COP models, pass ``strip_objective=True`` to enumerate feasible solutions
+    via ``Model(constraints)`` instead of all optimal assignments.
+    """
     namespace = _build_cpmpy_namespace(code_text, instance_dict)
     max_solutions = _effective_solution_limit(solution_limit)
 
@@ -256,22 +376,22 @@ def execute_cpmpy_and_enumerate(
     model = namespace.get("model")
     if model is None:
         return _exec_failure("No `model` object found")
-    if not isinstance(model, Model):
-        return _exec_failure("`model` is not a CPMpy Model")
+
+    enum_model, prep_error = _prepare_cpmpy_enum_target(model, strip_objective=strip_objective)
+    if prep_error:
+        return _exec_failure(prep_error)
 
     missing = [v for v in decision_var_names if v not in namespace]
     if missing:
         return _exec_failure(f"Decision variables missing: {missing}")
 
     solution_space: set = set()
-    solution_count = [0]
 
     def _on_solution() -> None:
-        solution_count[0] += 1
         solution_space.add(_cpmpy_solution_key(decision_var_names, namespace))
 
     try:
-        model.solveAll(
+        n_found = enum_model.solveAll(
             display=_on_solution,
             solution_limit=max_solutions,
             time_limit=time_limit_sec,
@@ -279,15 +399,51 @@ def execute_cpmpy_and_enumerate(
     except Exception as e:
         return _exec_failure(f"Solver crashed: {type(e).__name__}: {e}")
 
-    error = ""
-    if solution_count[0] >= max_solutions:
-        error = f"Reached solution_limit={max_solutions}; full space may be truncated"
+    stop_meta = analyze_solve_all_stop(enum_model, n_found, max_solutions, time_limit_sec)
+
     return {
         "ok": True,
-        "error": error,
         "space": solution_space,
-        "num_solutions": solution_count[0],
+        "num_solutions": n_found,
+        **stop_meta,
     }
+
+
+def execute_cpmpy_and_enumerate(
+    code_text: str,
+    instance_dict: dict[str, Any],
+    decision_var_names: list[str],
+    solution_limit: int,
+    time_limit_sec: int,
+) -> dict[str, Any]:
+    """Backward-compatible entry point; does not strip objectives (CSP-style enumeration)."""
+    return execute_cpmpy_enumerate(
+        code_text=code_text,
+        instance_dict=instance_dict,
+        decision_var_names=decision_var_names,
+        solution_limit=solution_limit,
+        time_limit_sec=time_limit_sec,
+        strip_objective=False,
+    )
+
+
+def enumerate_solution_space_for_entry(
+    model_code: str,
+    instance_dict: dict[str, Any],
+    decision_vars: list[str],
+    problem_type: str,
+    solution_limit: int,
+    time_limit_sec: int,
+) -> dict[str, Any]:
+    """Enumerate with COP-aware objective stripping when ``problem_type == "COP"``."""
+    return execute_cpmpy_enumerate(
+        code_text=model_code,
+        instance_dict=instance_dict,
+        decision_var_names=decision_vars,
+        solution_limit=solution_limit,
+        time_limit_sec=time_limit_sec,
+        strip_objective=(problem_type == "COP"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -307,14 +463,12 @@ def _check_minizinc_syntax(
             text=True,
             timeout=timeout_sec,
         )
-        print(f"MiniZinc result: {result.returncode}")
-        print(f"MiniZinc stdout: {result.stdout}")
-        print(f"MiniZinc stderr: {result.stderr}")
+        logger.debug("MiniZinc compile rc=%s stderr=%s", result.returncode, result.stderr)
     except FileNotFoundError:
-        print("MiniZinc executable not found")
+        logger.debug("MiniZinc executable not found")
         return True, "MiniZinc executable not found; syntax not checked."
     except subprocess.TimeoutExpired:
-        print(f"MiniZinc process timed out after {timeout_sec}s")
+        logger.debug("MiniZinc compilation timed out after %ss", timeout_sec)
         return False, "MiniZinc compilation timed out."
 
     if result.returncode == 0:
@@ -370,9 +524,7 @@ def execute_minizinc_and_enumerate(
         model_path = Path(tmpdir) / "candidate.mzn"
         data_path = Path(tmpdir) / "candidate.dzn"
 
-        print(f"Writing model to {model_path}")
-        print(f"Writing data to {data_path}")
-        print(f"Code text: \n--------------------------------\n\n{code_text}\n\n--------------------------------\n\n")
+        logger.debug("Writing MiniZinc model to %s, data to %s", model_path, data_path)
 
         model_path.write_text(code_text, encoding="utf-8")
         data_path.write_text(_render_minizinc_dzn(instance_dict, code_text), encoding="utf-8")
@@ -397,14 +549,17 @@ def execute_minizinc_and_enumerate(
                 text=True,
                 timeout=time_limit_sec + 30,
             )
-            print(f"MiniZinc result: {result.returncode}")
-            # print(f"MiniZinc stdout: {result.stdout}")
-            print(f"MiniZinc stderr: {result.stderr}")
+            logger.debug(
+                "MiniZinc run rc=%s stdout=%s stderr=%s",
+                result.returncode,
+                result.stdout[: min(len(result.stdout), 1000)],
+                result.stderr,
+            )
         except FileNotFoundError:
-            print("MiniZinc executable not found")
+            logger.debug("MiniZinc executable not found")
             return _exec_failure("MiniZinc executable not found")
         except subprocess.TimeoutExpired:
-            print(f"MiniZinc process timed out after {time_limit_sec + 30}s")
+            logger.debug("MiniZinc process timed out after %ss", time_limit_sec + 30)
             return _exec_failure(f"MiniZinc process timed out after {time_limit_sec + 30}s")
 
         stdout = result.stdout or ""
@@ -415,6 +570,7 @@ def execute_minizinc_and_enumerate(
             return _exec_failure((stderr.strip() or "MiniZinc run failed"))
 
         space = _minizinc_solutions_from_stream(stdout, decision_var_names)
+        logger.debug("MiniZinc solution-space size: %d", len(space))
         if not space:
             if "=====UNSATISFIABLE=====" in combined:
                 return {"ok": True, "error": "", "space": set(), "num_solutions": 0}
@@ -454,15 +610,20 @@ def enumerate_solution_space(
     decision_var_names: list[str],
     solution_limit: int,
     time_limit_sec: int,
+    *,
+    strip_objective: bool | None = None,
 ) -> tuple[dict[str, Any], set]:
     language_key = language.strip().lower()
     if language_key == "cpmpy":
-        result = execute_cpmpy_and_enumerate(
+        if strip_objective is None:
+            strip_objective = classify_problem_type_strict(code_text)[0] == "COP"
+        result = execute_cpmpy_enumerate(
             code_text=code_text,
             instance_dict=instance_dict,
             decision_var_names=decision_var_names,
             solution_limit=solution_limit,
             time_limit_sec=time_limit_sec,
+            strip_objective=strip_objective,
         )
     elif language_key == "minizinc":
         result = execute_minizinc_and_enumerate(
@@ -529,7 +690,11 @@ def evaluate_candidate_code(
     # When truncated, any false-negative count is unreliable: we simply may not have
     # enumerated far enough to find all reference solutions, so we must NOT conclude
     # incompleteness from such a run.
-    candidate_truncated = "Reached solution_limit" in exec_result.get("error", "")
+    candidate_truncated = bool(
+        exec_result.get("hit_solution_limit")
+        or exec_result.get("stop_reason") == "solution_limit"
+        or "Reached solution_limit" in exec_result.get("error", "")
+    )
 
     observed, false_positives, false_negatives = observed_label_from_sets(
         reference_space, candidate_space
@@ -592,8 +757,13 @@ def execute_cpmpy_sat_only(
     model = namespace.get("model")
     if model is None:
         return {"ok": False, "sat": None, "solution": None, "error": "No `model` object found"}
-    if not isinstance(model, Model):
-        return {"ok": False, "sat": None, "solution": None, "error": "`model` is not a CPMpy Model"}
+    if not isinstance(model, (Model, SolverInterface)):
+        return {
+            "ok": False,
+            "sat": None,
+            "solution": None,
+            "error": "`model` is not a CPMpy Model or solver",
+        }
 
     missing = [v for v in decision_var_names if v not in namespace]
     if missing:

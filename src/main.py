@@ -5,6 +5,7 @@ import argparse
 import logging
 from datetime import datetime
 from pathlib import Path
+import pandas as pd
 
 from .config import GENERATOR_MODELS, JUDGE_MODELS, contexts_from_jsonl, default_context
 from .data_generation import run_data_generation
@@ -111,10 +112,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=["reference_free"],
         metavar="APPROACH",
         help=(
-            "Which judge prompt variant(s) to run when --judge is active. "
+            "Which judge variant(s) to run when --judge is active. "
             f"Choices: {JUDGE_APPROACHES}. "
-            "Pass multiple values to run both "
-            "(e.g. --judge-approach reference_free reference_based). "
+            "Label approaches (reference_free, reference_based) assign a correctness label. "
+            "Score approaches (score_reference_free, score_reference_based) rate 1-5. "
+            "Binary approaches (binary_reference_free, binary_reference_based) give correct/incorrect. "
+            "Pass multiple values to run several in one go. "
             "Default: reference_free."
         ),
     )
@@ -188,7 +191,7 @@ def _run_pipeline(
         approaches = args.judge_approach if not run_all else ["reference_free"]
         if len(approaches) > 1:
             judge_df, judge_summary_df = run_judge_evaluation_all_approaches(
-                context, judge_specs, plain_payload=plain_payload
+                context, judge_specs, plain_payload=plain_payload, approaches=approaches
             )
         else:
             judge_df, judge_summary_df = run_judge_evaluation(
@@ -196,7 +199,6 @@ def _run_pipeline(
             )
         logger.info("\n%s", judge_df)
         logger.info("\n%s", judge_summary_df)
-
     if args.pairwise_judge:
         pairwise_df, pairwise_summary_df = run_pairwise_evaluation(
             context, judge_specs, plain_payload=plain_payload
@@ -231,9 +233,9 @@ def main() -> None:
 
     contexts = load_contexts(args)
     total = len(contexts)
+
+    
     for idx, context in enumerate(contexts, start=1):
-        # if idx == 4:
-        #     continue
         logger.info(
             "[run] ── problem %d/%d: %s ──", idx, total, context.targeted_id
         )

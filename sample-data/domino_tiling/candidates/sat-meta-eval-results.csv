@@ -1,0 +1,14 @@
+generator_llm,language,claimed_label,full_space_observed_label,full_space_correct,exec_status,reference_sat,candidate_sat,solution_in_ref,sat_only_correct,error
+openai/gpt-5.1-codex-mini,minizinc,unsound,unsound,False,ok,True,True,False,False,
+openai/gpt-5.1-codex-mini,minizinc,equivalent,equivalent,True,ok,True,True,True,True,
+openai/gpt-5.1-codex-mini,minizinc,non-executable,non-executable,False,non_executable,True,,,False,"MiniZinc syntax check failed: C:\Users\nmofa\AppData\Local\Temp\tmp2n2x1_2t\candidate.mzn:1.1:
+# over-restrict: forbid vertical domino starts on the first row (incomplete)
+
+^
+Error: syntax error, unexpected invalid token"
+openai/gpt-5.1-codex-mini,minizinc,incomplete,incomplete,False,ok,True,True,True,True,
+openai/gpt-5.1-codex-mini,minizinc,unsound-incomplete,unsound-incomplete,False,ok,True,True,False,False,
+openai/gpt-5.1-codex-mini,CPMpy,equivalent,equivalent,True,ok,True,True,True,True,
+openai/gpt-5.1-codex-mini,CPMpy,unsound,unsound,False,ok,True,True,False,False,
+openai/gpt-5.1-codex-mini,CPMpy,incomplete,incomplete,False,ok,True,True,True,True,
+openai/gpt-5.1-codex-mini,CPMpy,non-executable,non-executable,False,non_executable,True,,,False,NameError: name 'dominoes' is not defined

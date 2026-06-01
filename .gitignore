@@ -214,3 +214,12 @@ figures/
 old-data-storage/
 Playground.mzn
 dcp-bench-open.jsonl
+
+# Full benchmark dataset and working files (only sample-data/ is shared for now;
+# the complete dataset will be released separately)
+data-storage-*/
+important_files/
+
+# Generated figures / paper artifacts
+*.pdf
+judge_accuracy*.png
