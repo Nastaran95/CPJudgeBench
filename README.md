@@ -4,6 +4,9 @@ Benchmark for evaluating **LLM-as-judge** systems on constraint programming (CP)
 
 The pipeline (1) generates candidate CP models in multiple languages, (2) validates them against a reference model via solution-space enumeration, and (3) asks judge LLMs to classify or score those candidates.
 
+
+![Framework diagram](figures/framework_simple.png)
+
 ## Setup
 
 ```bash
@@ -87,6 +90,11 @@ src/
 preprocess_dcp_open.py   # optional preprocessing of DCP-Bench-Open problems
 ```
 
+## Confusion matrices
+
+![Confusion matrices for CPMpy](figures/ACL-confusion-matrices-cpmpy.png)
+
+![Confusion matrices for MiniZinc](figures/ACL-confusion-matrices-minizinc.png)
 
 ## Problem input
 
