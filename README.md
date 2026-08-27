@@ -1,9 +1,29 @@
 # CPJudgeBench
 
-Benchmark for evaluating **LLM-as-judge** systems on constraint programming (CP) model correctness.
+Official repository for the **EMNLP 2026 Main Conference** paper:
+
+**[CPJudgeBench: Meta-Evaluation of LLM Judges for Constraint Programming through Solution-Space Semantics](paper/CPJudgeBench.pdf)**
+
+[![EMNLP 2026 Main](https://img.shields.io/badge/EMNLP-2026%20Main-4b44ce.svg)](https://2026.emnlp.org/)
+[![Paper PDF](https://img.shields.io/badge/paper-PDF-B31B1B.svg)](paper/CPJudgeBench.pdf)
+[![OpenReview](https://img.shields.io/badge/OpenReview-E7ImNiglWw-8C1B13.svg)](https://openreview.net/forum?id=E7ImNiglWw)
+[![License: MIT](https://img.shields.io/badge/code%20license-MIT-yellow.svg)](LICENSE)
+
+
+**Nastaran Moradzadeh Farid**<sup>1</sup>, **Alireza Taghizadeh**<sup>2</sup>, **Tommaso Di Noia**<sup>3</sup>, **Yashar Deldjoo**<sup>3</sup>, **Sara Shafiee**<sup>1</sup>
+
+<sup>1</sup>Technical University of Denmark  <sup>2</sup>Configit A/S  <sup>3</sup>Politecnico di Bari
+
+
+**Paper:** [PDF](paper/CPJudgeBench.pdf) · [OpenReview](https://openreview.net/forum?id=E7ImNiglWw)
+
+The ACL Anthology record will be linked here once the proceedings are published.
+
+## Abstract
+
+Large Language Models (LLMs) are increasingly used as evaluators for code generation, but existing judge benchmarks mainly target general-purpose programming. Constraint Programming (CP) requires a stricter notion of correctness: a model is correct only if it faithfully represents the intended solution space, not merely if it executes, preserves satisfiability, or returns one valid solution. We introduce **CPJudgeBench**, a benchmark for meta-evaluating LLM judges of CP modeling correctness through solver-supported solution-space semantics. It contains 522 solver-validated candidate models from 82 CP problem families in CPMpy and MiniZinc, labeled as equivalent, unsound, incomplete, mixed, or non-executable. Across our experiments, we meta-evaluate a total of 15 LLM judges through semantic-label, binary-correctness, and score-based protocols. Results show that fine-grained semantic judging remains difficult, especially for reference-free MiniZinc, while stronger reasoning- and code-oriented models perform more reliably. Score-based LLM judgments also align better with solution-space similarity than standard text or code metrics.
 
 The pipeline (1) generates candidate CP models in multiple languages, (2) validates them against a reference model via solution-space enumeration, and (3) asks judge LLMs to classify or score those candidates.
-
 
 ![Framework diagram](figures/framework_simple.png)
 
@@ -179,3 +199,31 @@ Per-label results report accuracy within each ground-truth class:
 ## Problem input
 
 Problems are JSONL records with fields: `id`, `description`, `model`, `example_instance`, `decision_variables`, `instances`. Place your full problem file at `extra_files/dcp-bench-open.jsonl` (gitignored) or pass `--problems-file`.
+
+The 82 problem families in the paper are drawn from [DCP-Bench-Open](https://github.com/DCP-Bench/DCP-Bench-Open).
+
+## Citation
+
+If you use this repository or the benchmark, please cite:
+
+```bibtex
+@inproceedings{moradzadeh-farid-etal-2026-cpjudgebench,
+  title     = {{CPJudgeBench}: Meta-Evaluation of {LLM} Judges for Constraint Programming through Solution-Space Semantics},
+  author    = {Moradzadeh Farid, Nastaran and Taghizadeh, Alireza and Di Noia, Tommaso and Deldjoo, Yashar and Shafiee, Sara},
+  booktitle = {Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing},
+  month     = oct,
+  year      = {2026},
+  address   = {Budapest, Hungary},
+  publisher = {Association for Computational Linguistics},
+}
+```
+
+## Acknowledgements
+
+This work was supported by the Independent Research Fund Denmark (DFF), grant ID [10.46540/3163-00006B](https://doi.org/10.46540/3163-00006B).
+
+
+
+## Contact
+
+Questions about the paper or this repository: [nmofa@dtu.dk](mailto:nmofa@dtu.dk), or open a [GitHub issue](https://github.com/Nastaran95/CPJudgeBench/issues).

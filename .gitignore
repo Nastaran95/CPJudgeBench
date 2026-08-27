@@ -222,4 +222,5 @@ important_files/
 
 # Generated figures / paper artifacts
 *.pdf
+!paper/**/*.pdf
 judge_accuracy*.png
