@@ -25,7 +25,15 @@ Large Language Models (LLMs) are increasingly used as evaluators for code genera
 
 The pipeline (1) generates candidate CP models in multiple languages, (2) validates them against a reference model via solution-space enumeration, and (3) asks judge LLMs to classify or score those candidates.
 
-![Framework diagram](figures/framework_simple.png)
+**Overview.** Stage 1 constructs solver-validated candidates; Stage 2 meta-evaluates LLM judges against those oracle labels.
+
+![CPJudgeBench overview](figures/framework_simple.png)
+
+**Detailed pipeline.** Label-conditioned generation, solution-space oracle, and judge protocols (multi-class, binary, and score-based).
+
+![CPJudgeBench detailed framework](figures/framework_v6.png)
+
+[High-resolution PDF](figures/framework_v6.pdf)
 
 ## Setup
 
